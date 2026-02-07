@@ -10,7 +10,7 @@ app.use(express.json({limit:"50mb"})); // pdf base64
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "TU_CORREO@gmail.com",
+    user: "alexander.carpio@ucsp.edu.pe",
     pass: "cyms wxpk imhu whph"
   }
 });
@@ -19,6 +19,10 @@ const transporter = nodemailer.createTransport({
 app.post("/enviar-pdf", async (req, res) => {
   try {
     const { correo, pdfBase64 } = req.body;
+
+    if (!correo || !pdfBase64) {
+      return res.status(400).json({ error: "Faltan datos" });
+    }
 
     const buffer = Buffer.from(pdfBase64, "base64");
 
@@ -36,6 +40,7 @@ app.post("/enviar-pdf", async (req, res) => {
     });
 
     res.json({ ok: true });
+
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });
