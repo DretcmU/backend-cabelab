@@ -1,71 +1,56 @@
 import express from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";
+import { chromium } from "playwright";
 import { Resend } from "resend";
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const PORT = process.env.PORT || 10000;
 
-// HTML TEMPLATE
-function generarHTML(data) {
-  return `
-  <html>
-  <body style="font-family: Arial">
-    <h2>CABELAB FORMULARIO</h2>
-    <p><b>Cliente:</b> ${data.cliente}</p>
-    <p><b>RUC:</b> ${data.ruc}</p>
-    <p><b>Correo:</b> ${data.correo}</p>
-    <p><b>Teléfono:</b> ${data.telefono}</p>
-    <p><b>Fecha:</b> ${new Date().toLocaleString()}</p>
+// ====== TEST ======
+app.get("/", (req, res) => {
+  res.send("CABELAB Backend funcionando 🚀");
+});
 
-    <h3>Equipos</h3>
-    <ul>
-      ${data.equipos.map(e => `<li>${e.marca} ${e.modelo} ${e.serie}</li>`).join("")}
-    </ul>
-  </body>
-  </html>
-  `;
-}
+app.listen(PORT, () => {
+  console.log("Servidor en puerto", PORT);
+});
 
-// API
-app.post("/generar-enviar-pdf", async (req, res) => {
+
+app.post("/enviar-pdf", async (req, res) => {
   try {
-    const data = req.body;
+    const { email, html } = req.body;
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
+    if (!email) return res.send("No email");
 
+    // generar PDF
+    const browser = await chromium.launch();
     const page = await browser.newPage();
-    await page.setContent(generarHTML(data), { waitUntil: "load" });
-
-    const pdfBuffer = await page.pdf({ format: "A4" });
+    await page.setContent(html);
+    const pdf = await page.pdf({ format: "A4" });
     await browser.close();
 
-    // Enviar correo
+    // enviar correo
     await resend.emails.send({
       from: "CABELAB <onboarding@resend.dev>",
-      to: data.correo,
-      subject: "Formulario CABELAB",
-      html: "<p>Adjunto su formulario</p>",
+      to: email,
+      subject: "Formato de Recepción CABELAB",
+      html: "<p>Adjunto su formato en PDF</p>",
       attachments: [
         {
-          filename: "formulario.pdf",
-          content: pdfBuffer
+          filename: "formato.pdf",
+          content: pdf.toString("base64"),
         }
       ]
     });
 
-    res.json({ ok: true });
+    res.send("Correo enviado");
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error PDF");
+    res.status(500).send("Error");
   }
 });
-
-app.listen(process.env.PORT || 3000);
