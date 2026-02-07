@@ -1,56 +1,46 @@
 import express from "express";
+import nodemailer from "nodemailer";
 import cors from "cors";
-import { chromium } from "playwright";
-import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({limit:"50mb"})); // pdf base64
 
-const PORT = process.env.PORT || 10000;
-
-// ====== TEST ======
-app.get("/", (req, res) => {
-  res.send("CABELAB Backend funcionando 🚀");
+// EMAIL CONFIG (GMAIL)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "TU_CORREO@gmail.com",
+    pass: "cyms wxpk imhu whph"
+  }
 });
 
-app.listen(PORT, () => {
-  console.log("Servidor en puerto", PORT);
-});
-
-
+// API
 app.post("/enviar-pdf", async (req, res) => {
   try {
-    const { email, html } = req.body;
+    const { correo, pdfBase64 } = req.body;
 
-    if (!email) return res.send("No email");
+    const buffer = Buffer.from(pdfBase64, "base64");
 
-    // generar PDF
-    const browser = await chromium.launch();
-    const page = await browser.newPage();
-    await page.setContent(html);
-    const pdf = await page.pdf({ format: "A4" });
-    await browser.close();
-
-    // enviar correo
-    await resend.emails.send({
-      from: "CABELAB <onboarding@resend.dev>",
-      to: email,
-      subject: "Formato de Recepción CABELAB",
-      html: "<p>Adjunto su formato en PDF</p>",
+    await transporter.sendMail({
+      from: "CABELAB <TU_CORREO@gmail.com>",
+      to: correo,
+      subject: "Formato de recepción CABELAB",
+      text: "Adjunto su formato de recepción.",
       attachments: [
         {
-          filename: "formato.pdf",
-          content: pdf.toString("base64"),
+          filename: "Formato_CABELAB.pdf",
+          content: buffer
         }
       ]
     });
 
-    res.send("Correo enviado");
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error");
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
   }
 });
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Server OK", PORT));
