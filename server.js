@@ -1,51 +1,39 @@
 import express from "express";
-import nodemailer from "nodemailer";
 import cors from "cors";
+import { Resend } from "resend";
 
 const app = express();
 app.use(cors());
-app.use(express.json({limit:"50mb"})); // pdf base64
+app.use(express.json({ limit: "20mb" }));
 
-// EMAIL CONFIG (GMAIL)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "alexander.carpio@ucsp.edu.pe",
-    pass: "cyms wxpk imhu whph"
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// API
 app.post("/enviar-pdf", async (req, res) => {
   try {
     const { correo, pdfBase64 } = req.body;
+    if (!correo || !pdfBase64) return res.status(400).json({ error: "Faltan datos" });
 
-    if (!correo || !pdfBase64) {
-      return res.status(400).json({ error: "Faltan datos" });
-    }
+    const pdfBuffer = Buffer.from(pdfBase64, "base64");
 
-    const buffer = Buffer.from(pdfBase64, "base64");
-
-    await transporter.sendMail({
-      from: "CABELAB <TU_CORREO@gmail.com>",
+    await resend.emails.send({
+      from: "CABELAB <onboarding@resend.dev>", // gratis
       to: correo,
-      subject: "Formato de recepción CABELAB",
-      text: "Adjunto su formato de recepción.",
+      subject: "Formato de Recepción CABELAB",
+      html: "<p>Adjunto su formato.</p>",
       attachments: [
         {
           filename: "Formato_CABELAB.pdf",
-          content: buffer
+          content: pdfBuffer
         }
       ]
     });
 
     res.json({ ok: true });
 
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log("Server OK", PORT));
+app.listen(10000, () => console.log("Server ON"));
